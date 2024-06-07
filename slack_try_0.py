@@ -51,7 +51,6 @@ def ensure_file_exists(file_path):
         pass  # ファイルが既に存在する場合、何もしない
 
 
-# 定期的に最新のメッセージのみを収集してテキストファイルに書き込む関数
 def get_latest_messages():
     global last_timestamp  # 前回の収集結果を更新するためにglobal宣言
 
@@ -62,17 +61,26 @@ def get_latest_messages():
     if not messages:  # 新しいメッセージがない場合は関数を終了
         return
 
+    messages.reverse()  # メッセージリストを逆順にする
+
     new_last_timestamp = last_timestamp  # 新しい最後のタイムスタンプを一時的に保持
+
+    IGNORE_USER_ID = 'U06P15SJRC7'  # 無視したいユーザーのID
 
     with open(OUTPUT_FILE_PATH, 'a') as file:
         for message in messages:
+            user = message.get('user')
+            
+            # 特定のユーザーのメッセージを無視
+            if user == IGNORE_USER_ID:
+                continue
+
             timestamp = float(message.get('ts'))  # Slackからのタイムスタンプは文字列形式で、'ts'キーに格納されている
+            text = message.get('text')
 
             # メッセージをテキストファイルに書き込む
-            user = message.get('user')
-            text = message.get('text')
             file.write(f"ユーザ名: {user}, 発言内容: {text}\n")
-            
+    
             # ここでFirebaseにも保存
             doc_ref = db.collection('messages').document()
             doc_ref.set({
@@ -91,15 +99,15 @@ def get_latest_messages():
 # 初期値として最新のメッセージを設定
 last_timestamp = datetime.now().timestamp()
 
-# テキストファイルの内容を確認する関数
-def check_output_file():
-    with open(OUTPUT_FILE_PATH, 'r') as file:
-        contents = file.read()
-        #print(contents)
+# # テキストファイルの内容を確認する関数
+# def check_output_file():
+#     with open(OUTPUT_FILE_PATH, 'r') as file:
+#         contents = file.read()
+#         #print(contents)
 
-# テキストファイルをダウンロードする関数
-def download_output_file(destination_path):
-    shutil.copy2(OUTPUT_FILE_PATH, destination_path)
+# # テキストファイルをダウンロードする関数
+# def download_output_file(destination_path):
+#     shutil.copy2(OUTPUT_FILE_PATH, destination_path)
 
 # 30秒ごとにget_latest_messages関数を実行するスケジュールを設定
 schedule.every(30).seconds.do(get_latest_messages)
@@ -125,7 +133,7 @@ def suggest_improvements(choices, policy_options):
             if similarity > highest_similarity:
                 highest_similarity = similarity
                 best_policy_option = option 
-        if best_policy_option and highest_similarity > 0.7:  # 類似度閾値を超えるもののみをリストに追加
+        if best_policy_option and highest_similarity > 0.3:  # 類似度閾値を超えるもののみをリストに追加
             best_policy_option['similarity'] = highest_similarity # 類似度をオプションに追加
             best_policy_options.append(best_policy_option)
 
@@ -156,8 +164,8 @@ def analyze_discussion():
     ]
 
     choices = [
-        {'score': 0.9, 'text': 'テキスト1'},
-        {'score': 0.8, 'text': 'テキスト2'},
+        {'score': 0.7, 'text': 'テキスト1'},
+        {'score': 0.7, 'text': 'テキスト2'},
         {'score': 0.7, 'text': 'テキスト3'},
         # 他の選択肢を追加
     ]
