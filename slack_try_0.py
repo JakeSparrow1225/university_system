@@ -8,6 +8,8 @@ from datetime import datetime
 import shutil
 import openai
 import requests
+import spacy
+nlp = spacy.load("ja_core_news_md")  # 日本語モデルをロード
 
 #Slackのbot「1641」のトークン
 SLACK_ACCESS_TOKEN = ''
@@ -93,7 +95,7 @@ def get_latest_messages():
             })
 
             # メッセージをテキストファイルに書き込む
-            file.write(f"発言内容: {text}\n")
+            file.write(f"ユーザ名: {user}, 発言内容: {text}\n")
 
     # 最後のメッセージのタイムスタンプを更新
     last_timestamp = datetime.now().timestamp()
@@ -116,35 +118,29 @@ schedule.every(30).seconds.do(get_latest_messages)
 
 # ChatGPT関連
 def calculate_similarity(text1, text2):
-    # テキストの類似度を計算する処理を実装する
-    similarity = 0.75  # 仮の類似度値を設定
-
+    doc1 = nlp(text1)
+    doc2 = nlp(text2)
+    similarity = doc1.similarity(doc2)
     return similarity
 
 def suggest_improvements(choices, policy_options):
-    best_choice = None
-    best_score = -1
+    top_choices = sorted(choices, key=lambda x: x['score'], reverse=True)[:3]  # スコア上位3つの選択肢を取得
 
-    for choice in choices:
-        score = choice['score']
+    best_policy_options = []
+    for choice in top_choices:
         text = choice['text']
+        highest_similarity = -1
+        best_policy_option = None
+        for option in policy_options:
+            similarity = calculate_similarity(text, option['policy'])
+            if similarity > highest_similarity:
+                highest_similarity = similarity
+                best_policy_option = option
+            best_policy_option['similarity'] = highest_similarity  # 類似度をオプションに追加
+        if best_policy_option and highest_similarity > 0.7:  # 類似度閾値を超えるもののみをリストに追加
+            best_policy_options.append(best_policy_option)
 
-        # 生成されたテキストのスコアが最も高いものを選択
-        if score > best_score:
-            best_score = score
-            best_choice = text
-
-    # 最適な方針を選択する
-    best_policy_option = None
-    highest_similarity = -1
-
-    for option in policy_options:
-        similarity = calculate_similarity(best_choice, option['policy'])
-        if similarity > highest_similarity:
-            highest_similarity = similarity
-            best_policy_option = option
-
-    return best_policy_option
+    return best_policy_options
 
 def analyze_discussion():
     # テキストファイルの内容を読み込む
@@ -178,14 +174,20 @@ def analyze_discussion():
     improvement_suggestion = suggest_improvements(choices, policy_options)
 
     # Slackへの投稿
+    # Slackへの投稿
     url = "https://slack.com/api/chat.postMessage"
     headers = {"Authorization": "Bearer " + TOKEN}
-    data = {
-        'channel': CHANNEL_ID,
-        'text': f"最適な方針: {improvement_suggestion['policy']}\nメッセージ: {improvement_suggestion['message']}"
-    }
-    r = requests.post(url, headers=headers, data=data)
-    print("return ", r.json())
+    if improvement_suggestion:  # improvement_suggestionが空でないことを確認
+        first_suggestion = improvement_suggestion[0]  # 最初の提案を取得
+        data = {
+            'channel': CHANNEL_ID,
+            'text': f"最適な方針: {first_suggestion['policy']}\nメッセージ: {first_suggestion['message']}"
+        }
+        r = requests.post(url, headers=headers, data=data)
+    else:
+        print("改善提案が見つかりませんでした。")
+    
+    return discussion_text
 
 # 初回の分析を実行
 analyze_discussion()
@@ -196,12 +198,13 @@ def run_analysis():
     with open(OUTPUT_FILE_PATH, 'r') as file:
         current_text = file.read()
 
-    # テキストが変更されていれば分析を実行
-    if current_text != analyze_discussion.previous_text:
+    # analyze_discussion関数からの戻り値を使用して比較
+    new_text = analyze_discussion()
+    if new_text != analyze_discussion.previous_text:
         analyze_discussion()
 
     # 現在のテキストを保存
-    analyze_discussion.previous_text = current_text
+    analyze_discussion.previous_text = new_text
 
 # 初期化
 analyze_discussion.previous_text = ''
