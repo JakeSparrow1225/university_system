@@ -49,6 +49,8 @@ def collect_all_messages():
 # 最初に全てのメッセージを収集
 collect_all_messages()
 
+# 以下省略
+
 # 定期的に最新のメッセージのみを収集してテキストファイルに書き込む関数
 def get_latest_messages():
     global last_timestamp  # 前回の収集結果を更新するためにglobal宣言
@@ -82,7 +84,7 @@ def get_latest_messages():
             })
 
             # メッセージをテキストファイルに書き込む
-            file.write(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}\n")
+            file.write(f"発言内容: {text}\n")
 
     # 最後のメッセージのタイムスタンプを更新
     last_timestamp = datetime.now().timestamp()
