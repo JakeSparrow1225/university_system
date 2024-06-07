@@ -11,9 +11,11 @@ import openai
 import requests
 import spacy
 
-#Slackのbot「1641」のトークン
+
+
+#Slackのbot「1642」のトークン
 SLACK_ACCESS_TOKEN = ''
-#Slackのbot「1144」のトークン
+#Slackのbot「1145」のトークン
 TOKEN = ''
 #使ってるSlackのチャンネルID
 CHANNEL_ID = ''
@@ -21,7 +23,6 @@ CHANNEL_ID = ''
 FIREBASE_CREDENTIALS_PATH = ''
 #テキストファイルの出力先のパス
 OUTPUT_FILE_PATH = ''  
-
 # OpenAI APIキー
 #chatGPT_version==pip install openai==0.28
 openai.api_key = ''
@@ -30,8 +31,6 @@ openai.api_key = ''
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
-
-
 
 # 最初に実行する関数は、実際にはメッセージを収集しない
 def setup_initial_timestamp():
@@ -99,16 +98,6 @@ def get_latest_messages():
 # 初期値として最新のメッセージを設定
 last_timestamp = datetime.now().timestamp()
 
-# # テキストファイルの内容を確認する関数
-# def check_output_file():
-#     with open(OUTPUT_FILE_PATH, 'r') as file:
-#         contents = file.read()
-#         #print(contents)
-
-# # テキストファイルをダウンロードする関数
-# def download_output_file(destination_path):
-#     shutil.copy2(OUTPUT_FILE_PATH, destination_path)
-
 # 30秒ごとにget_latest_messages関数を実行するスケジュールを設定
 schedule.every(30).seconds.do(get_latest_messages)
 
@@ -119,6 +108,23 @@ def calculate_similarity(text1, text2):
     doc2 = nlp(text2)
     similarity = doc1.similarity(doc2)
     return similarity
+
+def dynamic_threshold_similarity(texts, base_text, initial_threshold=0.3, adjustment_factor=0.05):
+    """
+    動的閾値を用いて、基準テキストとの類似度に基づきテキストを選択する。
+    texts: 比較対象のテキストのリスト
+    base_text: 基準となるテキスト
+    initial_threshold: 初期閾値
+    adjustment_factor: 閾値の調整係数
+    """
+    selected_texts = []
+    for text in texts:
+        similarity = calculate_similarity(base_text, text)
+        if similarity > initial_threshold:
+            selected_texts.append(text)
+            # 閾値を動的に調整
+            initial_threshold += adjustment_factor
+    return selected_texts
 
 def suggest_improvements(choices, policy_options):
     top_choices = sorted(choices, key=lambda x: x['score'], reverse=True)[:3]  # スコア上位3つの選択肢を取得
@@ -139,7 +145,27 @@ def suggest_improvements(choices, policy_options):
 
     return best_policy_options
 
+# Slackにメッセージを投稿する関数
+def post_to_slack(message, channel_id, token):
+    url = "https://slack.com/api/chat.postMessage"
+    headers = {"Authorization": "Bearer " + token}
+    data = {
+        'channel': channel_id,
+        'text': message
+    }
+    response = requests.post(url, headers=headers, data=data)
+    if response.status_code != 200:
+        print(f"Slackへの投稿に失敗しました。ステータスコード: {response.status_code}")
+
+def ensure_file_exists(file_path):
+    # ファイルが存在しない場合は作成する
+    try:
+        open(file_path, 'r').close()
+    except FileNotFoundError:
+        open(file_path, 'w').close()
+
 def analyze_discussion():
+
     # 出力ファイルが存在することを保証
     ensure_file_exists(OUTPUT_FILE_PATH)
     # テキストファイルの内容を読み込む
@@ -164,8 +190,8 @@ def analyze_discussion():
     ]
 
     choices = [
-        {'score': 0.7, 'text': 'テキスト1'},
-        {'score': 0.7, 'text': 'テキスト2'},
+        {'score': 0.9, 'text': 'テキスト1'},
+        {'score': 0.8, 'text': 'テキスト2'},
         {'score': 0.7, 'text': 'テキスト3'},
         # 他の選択肢を追加
     ]
@@ -173,16 +199,10 @@ def analyze_discussion():
     improvement_suggestion = suggest_improvements(choices, policy_options)
 
     # Slackへの投稿
-    # Slackへの投稿
-    url = "https://slack.com/api/chat.postMessage"
-    headers = {"Authorization": "Bearer " + TOKEN}
     if improvement_suggestion:  # improvement_suggestionが空でないことを確認
         first_suggestion = improvement_suggestion[0]  # 最初の提案を取得
-        data = {
-            'channel': CHANNEL_ID,
-            'text': f"最適な方針: {first_suggestion['policy']}\nメッセージ: {first_suggestion['message']}"
-        }
-        r = requests.post(url, headers=headers, data=data)
+        message = f"最適な方針: {first_suggestion['policy']}\nメッセージ: {first_suggestion['message']}"
+        post_to_slack(message, CHANNEL_ID, TOKEN)
     else:
         print("改善提案が見つかりませんでした。")
     
@@ -193,6 +213,7 @@ analyze_discussion()
 
 # 定期的に分析を実行する関数
 def run_analysis():
+    OUTPUT_FILE_PATH = "discussion_output.txt"
     # テキストファイルの内容を確認する
     with open(OUTPUT_FILE_PATH, 'r') as file:
         current_text = file.read()
