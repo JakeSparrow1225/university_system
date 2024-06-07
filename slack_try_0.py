@@ -1,9 +1,18 @@
 from slack_sdk import WebClient
+from firebase_admin import firestore
+import firebase_admin
+from firebase_admin import credentials
 import schedule
 import time
 
 SLACK_ACCESS_TOKEN = ''
 CHANNEL_ID = ''
+FIREBASE_CREDENTIALS_PATH = ''
+
+# Firestoreの初期化
+cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 # 前回の収集結果を保持する変数
 last_messages = []
@@ -27,6 +36,14 @@ def get_messages():
         user = message.get('user')
         text = message.get('text')
         print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
+
+        # Firestoreにメッセージを保存
+        doc_ref = db.collection('messages').document()
+        doc_ref.set({
+            'channel': channel,
+            'user': user,
+            'text': text
+        })
 
 # 30秒ごとにget_messages関数を実行するスケジュールを設定
 schedule.every(30).seconds.do(get_messages)
