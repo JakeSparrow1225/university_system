@@ -10,6 +10,8 @@ import openai
 import requests
 import spacy
 from settings import SLACK_ACCESS_TOKEN,TOKEN,CHANNEL_ID,FIREBASE_CREDENTIALS_PATH,OUTPUT_FILE_PATH,OPENAI_API_KEY
+import difflib
+
 
 #chatGPT_version==pip install openai==0.28
 openai.api_key = OPENAI_API_KEY
@@ -124,11 +126,11 @@ def analyze_discussion_and_decide_policy():
     # APIからの応答を解析して、提案された方針を識別
     suggested_policy_text = response.choices[0].message['content'].strip()
 
-    # 提案された方針に最も近いメッセージを選択
+    # 提案された方針に最も近いメッセージを選択する新しいロジック
     selected_policy_message = None
-    max_similarity = -0.5
+    max_similarity = -1  # 最大類似度の初期値を-1に設定
     for option in policy_options:
-        similarity = sum(word in suggested_policy_text for word in option['policy'].split())
+        similarity = difflib.SequenceMatcher(None, suggested_policy_text, option['policy']).ratio()
         if similarity > max_similarity:
             selected_policy_message = option['message']
             max_similarity = similarity
@@ -137,7 +139,7 @@ def analyze_discussion_and_decide_policy():
         # 提案された方針に基づくメッセージをターミナルに出力
         print(f"提案された方針に基づくメッセージ: {selected_policy_message}")
     else:
-        # 提案された方針がpolicy_optionsの中に見つからない場合、これは起こりえないはずですが、念のための処置です。
+        # このケースは理論上発生しないはずですが、念のための処置
         print("提案された方針に一致するオプションが見つかりませんでした。")
 
 # 分析をスケジュールするための関数を追加
