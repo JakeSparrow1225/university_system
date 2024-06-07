@@ -10,6 +10,8 @@ SLACK_ACCESS_TOKEN = ''
 CHANNEL_ID = ''
 FIREBASE_CREDENTIALS_PATH = ''
 
+OUTPUT_FILE_PATH = ''  # File path for the output text file
+
 # Firestoreの初期化
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
 firebase_admin.initialize_app(cred)
@@ -21,27 +23,31 @@ def collect_all_messages():
     response = client.conversations_history(channel=CHANNEL_ID)
     messages = response.get('messages')
 
-    for message in messages:
-        channel = message.get('channel')
-        user = message.get('user')
-        text = message.get('text')
-        timestamp = message.get('ts')  # メッセージのタイムスタンプを使用
+    with open(OUTPUT_FILE_PATH, 'w') as file:
+        for message in messages:
+            channel = message.get('channel')
+            user = message.get('user')
+            text = message.get('text')
+            timestamp = message.get('timestamp')
 
-        print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
+            print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
 
-        # Firestoreにメッセージを保存
-        doc_ref = db.collection('messages').document()
-        doc_ref.set({
-            'channel': channel,
-            'user': user,
-            'text': text,
-            'timestamp': timestamp
-        })
+            # Firestoreにメッセージを保存
+            doc_ref = db.collection('messages').document()
+            doc_ref.set({
+                'channel': channel,
+                'user': user,
+                'text': text,
+                'timestamp': timestamp
+            })
+
+            # メッセージをテキストファイルに書き込む
+            file.write(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}\n")
 
 # 最初に全てのメッセージを収集
 collect_all_messages()
 
-# 定期的に最新のメッセージのみを収集する関数
+# 定期的に最新のメッセージのみを収集してテキストファイルに書き込む関数
 def get_latest_messages():
     global last_timestamp  # 前回の収集結果を更新するためにglobal宣言
 
@@ -51,28 +57,32 @@ def get_latest_messages():
 
     new_messages = []  # 新しく収集したメッセージを保持するリスト
 
-    for message in messages:
-        timestamp = message.get('ts')
-        if timestamp != last_timestamp:
-            new_messages.append(message)
-            last_timestamp = timestamp
+    with open(OUTPUT_FILE_PATH, 'a') as file:
+        for message in messages:
+            timestamp = message.get('timestamp')
+            if timestamp != last_timestamp:
+                new_messages.append(message)
+                last_timestamp = timestamp
 
-    for message in new_messages:
-        channel = message.get('channel')
-        user = message.get('user')
-        text = message.get('text')
-        timestamp = message.get('ts')  # メッセージのタイムスタンプを使用
+        for message in new_messages:
+            channel = message.get('channel')
+            user = message.get('user')
+            text = message.get('text')
+            timestamp = message.get('timestamp')
 
-        print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
+            print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
 
-        # Firestoreにメッセージを保存
-        doc_ref = db.collection('messages').document()
-        doc_ref.set({
-            'channel': channel,
-            'user': user,
-            'text': text,
-            'timestamp': timestamp
-        })
+            # Firestoreにメッセージを保存
+            doc_ref = db.collection('messages').document()
+            doc_ref.set({
+                'channel': channel,
+                'user': user,
+                'text': text,
+                'timestamp': timestamp
+            })
+
+            # メッセージをテキストファイルに書き込む
+            file.write(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}\n")
 
     # 最後のメッセージのタイムスタンプを更新
     last_timestamp = datetime.now().timestamp()
