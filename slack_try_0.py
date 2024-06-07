@@ -18,11 +18,11 @@ CHANNEL_ID = ''
 #Firebaseのパス
 FIREBASE_CREDENTIALS_PATH = ''
 #テキストファイルの出力先のパス
-OUTPUT_FILE_PATH = ''  
-
+OUTPUT_FILE_PATH = '' 
 # OpenAI APIキー
 #chatGPT_version==pip install openai==0.28
-openai.api_key = ''
+openai.api_key = '' 
+
 
 # Firestoreの初期化
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
@@ -93,7 +93,7 @@ def get_latest_messages():
             })
 
             # メッセージをテキストファイルに書き込む
-            file.write(f"発言内容: {text}\n")
+            file.write(f"ユーザ名: {user}, 発言内容: {text}\n")
 
     # 最後のメッセージのタイムスタンプを更新
     last_timestamp = datetime.now().timestamp()
@@ -185,7 +185,7 @@ def analyze_discussion():
         'text': f"最適な方針: {improvement_suggestion['policy']}\nメッセージ: {improvement_suggestion['message']}"
     }
     r = requests.post(url, headers=headers, data=data)
-    print("return ", r.json())
+    #print("return ", r.json())
 
 # 初回の分析を実行
 analyze_discussion()
