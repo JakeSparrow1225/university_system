@@ -180,8 +180,34 @@ def analyze_discussion_and_decide_policy():
         # このケースは理論上発生しないはずですが、念のための処置
         print("提案された方針に一致するオプションが見つかりませんでした。")
 
+# 各ユーザの発言回数を取得し、Slackに投稿する関数
+def post_user_message_counts_to_slack():
+    # Firebaseからデータを取得
+    users_ref = db.collection('messages')
+    docs = users_ref.stream()
+
+    # ユーザの発言回数をカウント
+    user_message_counts = {}
+    for doc in docs:
+        user_id = doc.get('user_id')
+        if user_id in user_message_counts:
+            user_message_counts[user_id] += 1
+        else:
+            user_message_counts[user_id] = 1
+
+    # ユーザ名を取得し、発言回数を整形
+    message_counts_text = "各ユーザの発言回数:\n"
+    for user_id, count in user_message_counts.items():
+        user_name = get_user_info(user_id) or "Unknown"
+        message_counts_text += f"{user_name}: {count}回\n"
+
+    # Slackに発言回数を投稿
+    post_to_slack(message_counts_text, CHANNEL_ID, TOKEN)
+
 # 分析をスケジュールするための関数を追加
 schedule.every(30).seconds.do(analyze_discussion_and_decide_policy)
+# 発言回数を投稿する関数を30秒ごとに実行するようにスケジュール
+schedule.every(30).seconds.do(post_user_message_counts_to_slack)
 
 # スケジューラーを起動するための無限ループ
 while True:
