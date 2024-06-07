@@ -115,48 +115,69 @@ schedule.every(30).seconds.do(get_latest_messages)
 
 
 #ChatGPT関連
-# アドバイスの例とそれに対応するメッセージを辞書として定義
-advice_examples = {
-    "もっと具体的な事例やデータを挙げると説得力が増します。": "具体例を探してみましょう！",
-    "相手の意見に対して敬意を持ちつつ、自分の意見を述べましょう。": "相手の意見を尊重しながら、自分の意見をしっかりと伝えましょう。",
-    "論点を絞って、主張を明確にしましょう。": "頑張りましょう！",
-    # 他のアドバイスの例とメッセージを追加...
-}
+def calculate_similarity(text1, text2):
+    # テキストの類似度を計算する処理を実装する
+    similarity = 0.75  # 仮の類似度値を設定
+
+    return similarity
+choices = [
+    {'score': 0.9, 'text': 'テキスト1'},
+    {'score': 0.8, 'text': 'テキスト2'},
+    {'score': 0.7, 'text': 'テキスト3'},
+    # 他の選択肢を追加
+]
+
+def suggest_improvements(choices, policy_options):
+    best_choice = None
+    best_score = -1
+
+    for choice in choices:
+        score = choice['score']
+        text = choice['text']
+
+        # 生成されたテキストのスコアが最も高いものを選択
+        if score > best_score:
+            best_score = score
+            best_choice = text
+
+    # 最適な方針を選択する
+    best_policy_option = None
+    highest_similarity = -1
+
+    for option in policy_options:
+        similarity = calculate_similarity(best_choice, option['policy'])
+        if similarity > highest_similarity:
+            highest_similarity = similarity
+            best_policy_option = option
+
+    return best_policy_option
 
 # テキストファイルの内容を読み込む
 with open(OUTPUT_FILE_PATH, 'r') as file:
     discussion_text = file.read()
 
+# 方針とメッセージのペアを用意する
+policy_options = [
+    {
+        'policy': '発言量が少ない参加者への発言を喚起する',
+        'message': 'プログラムの作成でつまづいている人はいますか？'
+    },
+    {
+        'policy': '一人が発言し続けないように発言者の固定化を防ぐ',
+        'message': '各自がそれぞれ作成したコードを一度共有しましょう'
+    },
+    {
+        'policy': 'メンバー間で問題点の共有を行い，議論を活発にする',
+        'message': 'この問題を構成しているアルゴリズムを共有しましょう'
+    },
+    # 他の方針とメッセージを追加
+]
 
-# ChatGPT APIにリクエストを送信してアドバイスを取得
-response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",  # 使用するモデルを指定
-    messages=[
-        {"role": "system", "content": "You are Kevin, a helpful Python programming assistant."},
-        {"role": "user", "content": discussion_text}
-    ],
-    max_tokens=100,  # APIから受け取るトークンの最大数（任意の値に設定）
-    n=1,  # モデルから生成する回答の数（任意の値に設定）
-    stop=None,  # APIの応答を停止するトークンを指定（任意の値に設定）
-    temperature=0.6,  # 出力の多様性を制御する温度パラメータ（任意の値に設定）
-    top_p=0.9,  # 出力の多様性を制御するトップpパラメータ（任意の値に設定）
-    frequency_penalty=0.0,  # 頻度ペナルティパラメータ（任意の値に設定）
-    presence_penalty=0.0,  # 存在ペナルティパラメータ（任意の値に設定）
-    api_key=openai.api_key  # APIキーを指定
-)
+improvement_suggestion = suggest_improvements(choices, policy_options)
 
-# APIからの応答から最適なアドバイスを取得
-best_advice = response.choices[0].message.content.strip()
-
-# 最適なアドバイスに応じたメッセージを取得
-advice_message = advice_examples.get(best_advice, "理解できませんでした。")
-
-# 最適なアドバイスとメッセージを表示
-print("提案されたアドバイス:")
-print(best_advice)
-print("メッセージ:")
-print(advice_message)
-
+# 最適な方針とメッセージを表示する
+print("最適な方針: ", improvement_suggestion['policy'])
+print("メッセージ: ", improvement_suggestion['message'])
 
 # 無限ループでスケジュールを実行し続けるから
 #これより下にコードを書かない
