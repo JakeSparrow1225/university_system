@@ -7,14 +7,22 @@ import time
 from datetime import datetime
 import shutil
 import openai
+import requests
 
 #Slackのbot「1641」のトークン
 SLACK_ACCESS_TOKEN = ''
+#Slackのbot「1144」のトークン
+TOKEN = ''
 #使ってるSlackのチャンネルID
 CHANNEL_ID = ''
 #Firebaseのパス
 FIREBASE_CREDENTIALS_PATH = ''
-OUTPUT_FILE_PATH = ''
+#テキストファイルの出力先のパス
+OUTPUT_FILE_PATH = ''  
+
+# OpenAI APIキー
+#chatGPT_version==pip install openai==0.28
+openai.api_key = ''
 
 # Firestoreの初期化
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
@@ -169,9 +177,15 @@ def analyze_discussion():
 
     improvement_suggestion = suggest_improvements(choices, policy_options)
 
-    # 最適な方針とメッセージを表示する
-    print("最適な方針: ", improvement_suggestion['policy'])
-    print("メッセージ: ", improvement_suggestion['message'])
+    # Slackへの投稿
+    url = "https://slack.com/api/chat.postMessage"
+    headers = {"Authorization": "Bearer " + TOKEN}
+    data = {
+        'channel': CHANNEL_ID,
+        'text': f"最適な方針: {improvement_suggestion['policy']}\nメッセージ: {improvement_suggestion['message']}"
+    }
+    r = requests.post(url, headers=headers, data=data)
+    print("return ", r.json())
 
 # 初回の分析を実行
 analyze_discussion()
