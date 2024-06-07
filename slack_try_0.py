@@ -69,7 +69,7 @@ def get_latest_messages():
 
     new_last_timestamp = last_timestamp  # 新しい最後のタイムスタンプを一時的に保持
 
-    IGNORE_USER_ID = 'U06P15SJRC7'  # 無視したいユーザーのID
+    IGNORE_USER_ID = ''  # 無視したいユーザーのID
 
     with open(OUTPUT_FILE_PATH, 'a') as file:
         for message in messages:
