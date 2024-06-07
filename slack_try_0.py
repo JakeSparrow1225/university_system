@@ -88,7 +88,6 @@ last_timestamp = datetime.now().timestamp()
 # 30秒ごとにget_latest_messages関数を実行するスケジュールを設定
 schedule.every(30).seconds.do(get_latest_messages)
 
-
 policy_options = [
     {
         'policy': '発言量が少ない参加者への発言を喚起する',
@@ -110,26 +109,39 @@ def analyze_discussion_and_decide_policy():
     with open(OUTPUT_FILE_PATH, 'r') as file:
         discussion_text = file.read()
 
-    # ChatGPT APIを使用して議論を分析（ここを修正）
+    # ChatGPT APIを使用して議論を分析
     response = openai.ChatCompletion.create(
         model="gpt-4-turbo",  # 適切なモデルを指定
         messages=[
             {"role": "system", "content": "以下の議論を分析して、改善するための最適な方針を提案してください。"},
             {"role": "user", "content": discussion_text},
-            {"role": "system", "content": "\n".join([option['policy'] for option in policy_options])}
+            {"role": "system", "content": "次の方針のうち、どれが最適でしょうか？\n" + "\n".join([option['policy'] for option in policy_options])}
         ],
         temperature=0.7,
         max_tokens=150
     )
 
-    # APIからの応答を解析（この部分も若干修正が必要かもしれません）
-    suggested_policy = response.choices[0].message['content'].strip()
+    # APIからの応答を解析して、提案された方針を識別
+    suggested_policy_text = response.choices[0].message['content'].strip()
 
-    # 提案された方針をターミナルに出力
-    print(f"提案された方針: {suggested_policy}")
+    # 提案された方針に最も近いメッセージを選択
+    selected_policy_message = None
+    max_similarity = -0.5
+    for option in policy_options:
+        similarity = sum(word in suggested_policy_text for word in option['policy'].split())
+        if similarity > max_similarity:
+            selected_policy_message = option['message']
+            max_similarity = similarity
+
+    if selected_policy_message:
+        # 提案された方針に基づくメッセージをターミナルに出力
+        print(f"提案された方針に基づくメッセージ: {selected_policy_message}")
+    else:
+        # 提案された方針がpolicy_optionsの中に見つからない場合、これは起こりえないはずですが、念のための処置です。
+        print("提案された方針に一致するオプションが見つかりませんでした。")
 
 # 分析をスケジュールするための関数を追加
-schedule.every(30).seconds.do(analyze_discussion_and_decide_policy) 
+schedule.every(30).seconds.do(analyze_discussion_and_decide_policy)  
 
 # スケジューラーを起動するための無限ループ
 while True:
