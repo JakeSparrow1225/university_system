@@ -11,7 +11,7 @@ import requests
 import spacy
 from settings import SLACK_ACCESS_TOKEN,TOKEN,CHANNEL_ID,FIREBASE_CREDENTIALS_PATH,OUTPUT_FILE_PATH,OPENAI_API_KEY
 import difflib
-
+import asyncio
 
 #chatGPT_version==pip install openai==0.28
 openai.api_key = OPENAI_API_KEY
@@ -90,6 +90,33 @@ last_timestamp = datetime.now().timestamp()
 # 30秒ごとにget_latest_messages関数を実行するスケジュールを設定
 schedule.every(30).seconds.do(get_latest_messages)
 
+async def fetch_messages():
+    messages_ref = db.collection('messages')
+    try:
+        # asyncio.to_threadを使用して非同期に変更
+        docs = await asyncio.to_thread(messages_ref.stream)
+    except Exception as e:
+        print(f"Firestoreからのデータ取得中にエラーが発生しました: {e}")
+        return []
+
+    return [doc.to_dict() for doc in docs]
+
+def count_user_messages():
+    messages = asyncio.run(fetch_messages())  # 非同期関数の結果を待機
+
+    # ユーザごとの発言回数をカウント
+    user_message_counts = {}
+    for message in messages:
+        user = message.get('user')
+        user_message_counts[user] = user_message_counts.get(user, 0) + 1  # getメソッドで簡潔に
+
+    # 結果の表示
+    for user, count in user_message_counts.items():
+        print(f"ユーザー {user} の発言回数: {count}")
+
+# 実行例
+count_user_messages()
+
 # Slackにメッセージを投稿する関数
 def post_to_slack(message, channel_id, token):
     url = "https://slack.com/api/chat.postMessage"
@@ -161,7 +188,11 @@ def analyze_discussion_and_decide_policy():
 # 分析をスケジュールするための関数を追加
 schedule.every(30).seconds.do(analyze_discussion_and_decide_policy)
 
+# 既存のスケジュール定義の下に、新たなスケジュールを追加
+schedule.every(30).minutes.do(count_user_messages)  # 1分ごとに実行されるように設定
+
 # スケジューラーを起動するための無限ループ
 while True:
     schedule.run_pending()
     time.sleep(1)
+    
