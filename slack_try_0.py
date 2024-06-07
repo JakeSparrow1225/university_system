@@ -90,6 +90,18 @@ last_timestamp = datetime.now().timestamp()
 # 30秒ごとにget_latest_messages関数を実行するスケジュールを設定
 schedule.every(30).seconds.do(get_latest_messages)
 
+# Slackにメッセージを投稿する関数
+def post_to_slack(message, channel_id, token):
+    url = "https://slack.com/api/chat.postMessage"
+    headers = {"Authorization": "Bearer " + token}
+    data = {
+        'channel': channel_id,
+        'text': message
+    }
+    response = requests.post(url, headers=headers, data=data)
+    if response.status_code != 200:
+        print(f"Slackへの投稿に失敗しました。ステータスコード: {response.status_code}")
+
 policy_options = [
     {
         'policy': '発言量が少ない参加者への発言を喚起する',
@@ -136,14 +148,18 @@ def analyze_discussion_and_decide_policy():
             max_similarity = similarity
 
     if selected_policy_message:
-        # 提案された方針に基づくメッセージをターミナルに出力
-        print(f"提案された方針に基づくメッセージ: {selected_policy_message}")
+        # Slackに提案された方針に基づくメッセージを投稿
+        slack_message = f"提案された方針に基づくメッセージ: {selected_policy_message}"
+        # SlackのチャンネルIDとトークンを設定してください
+        channel_id = CHANNEL_ID
+        token = TOKEN
+        post_to_slack(slack_message, channel_id, token)
     else:
         # このケースは理論上発生しないはずですが、念のための処置
         print("提案された方針に一致するオプションが見つかりませんでした。")
 
 # 分析をスケジュールするための関数を追加
-schedule.every(30).seconds.do(analyze_discussion_and_decide_policy)  
+schedule.every(30).seconds.do(analyze_discussion_and_decide_policy)
 
 # スケジューラーを起動するための無限ループ
 while True:
