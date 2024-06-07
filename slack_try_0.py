@@ -8,17 +8,13 @@ from datetime import datetime
 import shutil
 import openai
 
+#Slackのbot「1641」のトークン
 SLACK_ACCESS_TOKEN = ''
+#使ってるSlackのチャンネルID
 CHANNEL_ID = ''
-FIREBASE_CREDENTIALS_PATH = 'C'
-# File path for the output text file
-OUTPUT_FILE_PATH = ''  
-
-# OpenAI APIキー
-#chatGPT_version==pip install openai==0.28
-openai.api_key = ''
-
-
+#Firebaseのパス
+FIREBASE_CREDENTIALS_PATH = ''
+OUTPUT_FILE_PATH = ''
 
 # Firestoreの初期化
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
