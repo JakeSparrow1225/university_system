@@ -5,6 +5,7 @@ from firebase_admin import credentials
 import schedule
 import time
 from datetime import datetime
+import shutil
 
 SLACK_ACCESS_TOKEN = ''
 CHANNEL_ID = ''
@@ -29,7 +30,7 @@ def collect_all_messages():
             user = message.get('user')
             text = message.get('text')
             timestamp = message.get('timestamp')
- 
+
             if timestamp is None:
                 timestamp = datetime.now().timestamp()
 
@@ -48,6 +49,7 @@ def collect_all_messages():
 # 最初に全てのメッセージを収集
 collect_all_messages()
 
+# 以下省略
 
 # 定期的に最新のメッセージのみを収集してテキストファイルに書き込む関数
 def get_latest_messages():
@@ -71,8 +73,6 @@ def get_latest_messages():
             user = message.get('user')
             text = message.get('text')
             timestamp = message.get('timestamp')
-
-            #print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
 
             # Firestoreにメッセージを保存
             doc_ref = db.collection('messages').document()
@@ -108,3 +108,10 @@ def check_output_file():
 
 # テキストファイルの内容を確認
 check_output_file()
+
+# テキストファイルをダウンロードする関数
+def download_output_file(destination_path):
+    shutil.copy2(OUTPUT_FILE_PATH, destination_path)
+
+# テキストファイルをダウンロードする
+download_output_file('')
