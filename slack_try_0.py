@@ -29,8 +29,9 @@ def collect_all_messages():
             user = message.get('user')
             text = message.get('text')
             timestamp = message.get('timestamp')
-
-            #print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
+ 
+            if timestamp is None:
+                timestamp = datetime.now().timestamp()
 
             # Firestoreにメッセージを保存
             doc_ref = db.collection('messages').document()
@@ -46,6 +47,7 @@ def collect_all_messages():
 
 # 最初に全てのメッセージを収集
 collect_all_messages()
+
 
 # 定期的に最新のメッセージのみを収集してテキストファイルに書き込む関数
 def get_latest_messages():
@@ -70,7 +72,7 @@ def get_latest_messages():
             text = message.get('text')
             timestamp = message.get('timestamp')
 
-            print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
+            #print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
 
             # Firestoreにメッセージを保存
             doc_ref = db.collection('messages').document()
