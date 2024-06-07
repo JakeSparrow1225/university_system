@@ -13,15 +13,15 @@ import spacy
 
 
 
-#Slackのbot「1642」のトークン
+#Slackのbot「1642」のトークンOK
 SLACK_ACCESS_TOKEN = ''
-#Slackのbot「1145」のトークン
+#Slackのbot「1145」のトークンOK
 TOKEN = ''
-#使ってるSlackのチャンネルID
+#使ってるSlackのチャンネルIDOK
 CHANNEL_ID = ''
-#Firebaseのパス
+#FirebaseのパスOK
 FIREBASE_CREDENTIALS_PATH = ''
-#テキストファイルの出力先のパス
+#テキストファイルの出力先のパスOk
 OUTPUT_FILE_PATH = ''  
 # OpenAI APIキー
 #chatGPT_version==pip install openai==0.28
@@ -64,7 +64,7 @@ def get_latest_messages():
 
     new_last_timestamp = last_timestamp  # 新しい最後のタイムスタンプを一時的に保持
 
-    IGNORE_USER_ID = 'U06P15SJRC7'  # 無視したいユーザーのID
+    IGNORE_USER_ID = ''  # 無視したいユーザーのID
 
     with open(OUTPUT_FILE_PATH, 'a') as file:
         for message in messages:
