@@ -49,8 +49,6 @@ def collect_all_messages():
 # 最初に全てのメッセージを収集
 collect_all_messages()
 
-# 以下省略
-
 # 定期的に最新のメッセージのみを収集してテキストファイルに書き込む関数
 def get_latest_messages():
     global last_timestamp  # 前回の収集結果を更新するためにglobal宣言
