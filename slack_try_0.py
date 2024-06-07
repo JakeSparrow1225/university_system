@@ -55,7 +55,6 @@ def collect_all_messages():
 # 最初に全てのメッセージを収集
 collect_all_messages()
 
-# 以下省略
 
 # 定期的に最新のメッセージのみを収集してテキストファイルに書き込む関数
 def get_latest_messages():
@@ -111,21 +110,12 @@ def download_output_file(destination_path):
 # 30秒ごとにget_latest_messages関数を実行するスケジュールを設定
 schedule.every(30).seconds.do(get_latest_messages)
 
-
-
-
-#ChatGPT関連
+# ChatGPT関連
 def calculate_similarity(text1, text2):
     # テキストの類似度を計算する処理を実装する
     similarity = 0.75  # 仮の類似度値を設定
 
     return similarity
-choices = [
-    {'score': 0.9, 'text': 'テキスト1'},
-    {'score': 0.8, 'text': 'テキスト2'},
-    {'score': 0.7, 'text': 'テキスト3'},
-    # 他の選択肢を追加
-]
 
 def suggest_improvements(choices, policy_options):
     best_choice = None
@@ -152,36 +142,64 @@ def suggest_improvements(choices, policy_options):
 
     return best_policy_option
 
-# テキストファイルの内容を読み込む
-with open(OUTPUT_FILE_PATH, 'r') as file:
-    discussion_text = file.read()
+def analyze_discussion():
+    # テキストファイルの内容を読み込む
+    with open(OUTPUT_FILE_PATH, 'r') as file:
+        discussion_text = file.read()
 
-# 方針とメッセージのペアを用意する
-policy_options = [
-    {
-        'policy': '発言量が少ない参加者への発言を喚起する',
-        'message': 'プログラムの作成でつまづいている人はいますか？'
-    },
-    {
-        'policy': '一人が発言し続けないように発言者の固定化を防ぐ',
-        'message': '各自がそれぞれ作成したコードを一度共有しましょう'
-    },
-    {
-        'policy': 'メンバー間で問題点の共有を行い，議論を活発にする',
-        'message': 'この問題を構成しているアルゴリズムを共有しましょう'
-    },
-    # 他の方針とメッセージを追加
-]
+    # 方針とメッセージのペアを用意する
+    policy_options = [
+        {
+            'policy': '発言量が少ない参加者への発言を喚起する',
+            'message': 'プログラムの作成でつまづいている人はいますか？'
+        },
+        {
+            'policy': '一人が発言し続けないように発言者の固定化を防ぐ',
+            'message': '各自がそれぞれ作成したコードを一度共有しましょう'
+        },
+        {
+            'policy': 'メンバー間で問題点の共有を行い，議論を活発にする',
+            'message': 'この問題を構成しているアルゴリズムを共有しましょう'
+        },
+        # 他の方針とメッセージを追加
+    ]
 
-improvement_suggestion = suggest_improvements(choices, policy_options)
+    choices = [
+        {'score': 0.9, 'text': 'テキスト1'},
+        {'score': 0.8, 'text': 'テキスト2'},
+        {'score': 0.7, 'text': 'テキスト3'},
+        # 他の選択肢を追加
+    ]
 
-# 最適な方針とメッセージを表示する
-print("最適な方針: ", improvement_suggestion['policy'])
-print("メッセージ: ", improvement_suggestion['message'])
+    improvement_suggestion = suggest_improvements(choices, policy_options)
 
-# 無限ループでスケジュールを実行し続けるから
-#これより下にコードを書かない
+    # 最適な方針とメッセージを表示する
+    print("最適な方針: ", improvement_suggestion['policy'])
+    print("メッセージ: ", improvement_suggestion['message'])
+
+# 初回の分析を実行
+analyze_discussion()
+
+# 定期的に分析を実行する関数
+def run_analysis():
+    # テキストファイルの内容を確認する
+    with open(OUTPUT_FILE_PATH, 'r') as file:
+        current_text = file.read()
+
+    # テキストが変更されていれば分析を実行
+    if current_text != analyze_discussion.previous_text:
+        analyze_discussion()
+
+    # 現在のテキストを保存
+    analyze_discussion.previous_text = current_text
+
+# 初期化
+analyze_discussion.previous_text = ''
+
+# 分析を30秒ごとに実行するスケジュールを設定
+schedule.every(30).seconds.do(run_analysis)
+
+# 無限ループでスケジュールを実行し続ける
 while True:
     schedule.run_pending()
     time.sleep(1)
-    
