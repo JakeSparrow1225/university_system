@@ -5,11 +5,11 @@ from firebase_admin import credentials
 import schedule
 import time
 from datetime import datetime
+from datetime import datetime 
 import shutil
 import openai
 import requests
 import spacy
-nlp = spacy.load("ja_core_news_md")  # 日本語モデルをロード
 
 #Slackのbot「1641」のトークン
 SLACK_ACCESS_TOKEN = ''
@@ -31,35 +31,24 @@ cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# 最初に全てのメッセージを収集する関数
-def collect_all_messages():
-    client = WebClient(SLACK_ACCESS_TOKEN)
-    response = client.conversations_history(channel=CHANNEL_ID)
-    messages = response.get('messages')
 
-    with open(OUTPUT_FILE_PATH, 'w') as file:
-        for message in reversed(messages):  # メッセージのリストを逆順に処理する
-            channel = message.get('channel')
-            user = message.get('user')
-            text = message.get('text')
-            timestamp = message.get('timestamp')
 
-            if timestamp is None:
-                timestamp = datetime.now().timestamp()
+# 最初に実行する関数は、実際にはメッセージを収集しない
+def setup_initial_timestamp():
+    global last_timestamp  # 最後のメッセージのタイムスタンプを保持するグローバル変数
+    # 現在時刻のタイムスタンプをセットアップ
+    # last_timestamp = datetime.now().timestamp()
+# 初期セットアップとして、現在のタイムスタンプを更新
+setup_initial_timestamp()
 
-            # Firestoreにメッセージを保存
-            doc_ref = db.collection('messages').document()
-            doc_ref.set({
-                'channel': channel,
-                'user': user,
-                'text': text,
-                'timestamp': timestamp
-            })
-
-            # メッセージをテキストファイルに書き込む
-            file.write(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}\n")
-# 最初に全てのメッセージを収集
-collect_all_messages()
+def ensure_file_exists(file_path):
+    #指定されたパスにファイルが存在することを保証する。存在しない場合は新たに作成する。
+    try:
+        # ファイルが存在するか確認し、存在しない場合は作成する
+        with open(file_path, 'x') as file:
+            pass  # ファイルの作成に成功した場合、ここでは何もしない
+    except FileExistsError:
+        pass  # ファイルが既に存在する場合、何もしない
 
 
 # 定期的に最新のメッセージのみを収集してテキストファイルに書き込む関数
@@ -70,35 +59,34 @@ def get_latest_messages():
     response = client.conversations_history(channel=CHANNEL_ID, oldest=last_timestamp)
     messages = response.get('messages')
 
-    new_messages = []  # 新しく収集したメッセージを保持するリスト
+    if not messages:  # 新しいメッセージがない場合は関数を終了
+        return
+
+    new_last_timestamp = last_timestamp  # 新しい最後のタイムスタンプを一時的に保持
 
     with open(OUTPUT_FILE_PATH, 'a') as file:
         for message in messages:
-            timestamp = message.get('timestamp')
-            if timestamp != last_timestamp:
-                new_messages.append(message)
-                last_timestamp = timestamp
-
-        for message in new_messages:
-            channel = message.get('channel')
-            user = message.get('user')
-            text = message.get('text')
-            timestamp = message.get('timestamp')
-
-            # Firestoreにメッセージを保存
-            doc_ref = db.collection('messages').document()
-            doc_ref.set({
-                'channel': channel,
-                'user': user,
-                'text': text,
-                'timestamp': timestamp
-            })
+            timestamp = float(message.get('ts'))  # Slackからのタイムスタンプは文字列形式で、'ts'キーに格納されている
 
             # メッセージをテキストファイルに書き込む
+            user = message.get('user')
+            text = message.get('text')
             file.write(f"ユーザ名: {user}, 発言内容: {text}\n")
+            
+            # ここでFirebaseにも保存
+            doc_ref = db.collection('messages').document()
+            doc_ref.set({
+                'user': user,
+                'text': text,
+                'timestamp': firestore.SERVER_TIMESTAMP  # Firestoreが提供するサーバータイムスタンプ
+            })
 
-    # 最後のメッセージのタイムスタンプを更新
-    last_timestamp = datetime.now().timestamp()
+            # 新しい最後のタイムスタンプを更新
+            if timestamp > new_last_timestamp:
+                new_last_timestamp = timestamp
+
+    # 全ての新しいメッセージを処理した後、最後のタイムスタンプを更新
+    last_timestamp = new_last_timestamp
 
 # 初期値として最新のメッセージを設定
 last_timestamp = datetime.now().timestamp()
@@ -118,6 +106,7 @@ schedule.every(30).seconds.do(get_latest_messages)
 
 # ChatGPT関連
 def calculate_similarity(text1, text2):
+    nlp = spacy.load("ja_core_news_md")  # 日本語モデルをロード
     doc1 = nlp(text1)
     doc2 = nlp(text2)
     similarity = doc1.similarity(doc2)
@@ -135,14 +124,16 @@ def suggest_improvements(choices, policy_options):
             similarity = calculate_similarity(text, option['policy'])
             if similarity > highest_similarity:
                 highest_similarity = similarity
-                best_policy_option = option
-            best_policy_option['similarity'] = highest_similarity  # 類似度をオプションに追加
+                best_policy_option = option 
         if best_policy_option and highest_similarity > 0.7:  # 類似度閾値を超えるもののみをリストに追加
+            best_policy_option['similarity'] = highest_similarity # 類似度をオプションに追加
             best_policy_options.append(best_policy_option)
 
     return best_policy_options
 
 def analyze_discussion():
+    # 出力ファイルが存在することを保証
+    ensure_file_exists(OUTPUT_FILE_PATH)
     # テキストファイルの内容を読み込む
     with open(OUTPUT_FILE_PATH, 'r') as file:
         discussion_text = file.read()
@@ -199,12 +190,9 @@ def run_analysis():
         current_text = file.read()
 
     # analyze_discussion関数からの戻り値を使用して比較
-    new_text = analyze_discussion()
+    new_text = analyze_discussion()  # analyze_discussion関数を1回だけ呼び出す
     if new_text != analyze_discussion.previous_text:
-        analyze_discussion()
-
-    # 現在のテキストを保存
-    analyze_discussion.previous_text = new_text
+        analyze_discussion.previous_text = new_text  # 前回のテキストを更新
 
 # 初期化
 analyze_discussion.previous_text = ''
