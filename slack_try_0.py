@@ -30,7 +30,7 @@ def collect_all_messages():
             text = message.get('text')
             timestamp = message.get('timestamp')
 
-            print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
+            #print(f"チャンネル: {channel}, ユーザ名: {user}, 発言内容: {text}")
 
             # Firestoreにメッセージを保存
             doc_ref = db.collection('messages').document()
@@ -97,3 +97,12 @@ schedule.every(30).seconds.do(get_latest_messages)
 while True:
     schedule.run_pending()
     time.sleep(1)
+
+# テキストファイルの内容を確認する関数
+def check_output_file():
+    with open(OUTPUT_FILE_PATH, 'r') as file:
+        contents = file.read()
+        print(contents)
+
+# テキストファイルの内容を確認
+check_output_file()
