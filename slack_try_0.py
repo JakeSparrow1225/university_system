@@ -5,15 +5,15 @@ from firebase_admin import credentials
 import schedule
 import time
 from datetime import datetime
-from datetime import datetime 
 import openai
 import requests
 import spacy
-from settings import SLACK_ACCESS_TOKEN,TOKEN,CHANNEL_ID,FIREBASE_CREDENTIALS_PATH,OUTPUT_FILE_PATH,OPENAI_API_KEY
+from settings import SLACK_ACCESS_TOKEN, TOKEN, CHANNEL_ID, FIREBASE_CREDENTIALS_PATH, OUTPUT_FILE_PATH, OPENAI_API_KEY
 import difflib
-import asyncio
+from slack_sdk.errors import SlackApiError
 
-#chatGPT_version==pip install openai==0.28
+
+# chatGPT_version==pip install openai==0.28
 openai.api_key = OPENAI_API_KEY
 
 # Firestoreの初期化
@@ -21,16 +21,20 @@ cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+# Slackクライアントの初期化
+slack_client = WebClient(SLACK_ACCESS_TOKEN)
+
 # 最初に実行する関数は、実際にはメッセージを収集しない
 def setup_initial_timestamp():
     global last_timestamp  # 最後のメッセージのタイムスタンプを保持するグローバル変数
     # 現在時刻のタイムスタンプをセットアップ
-    # last_timestamp = datetime.now().timestamp()
+    last_timestamp = datetime.now().timestamp()
+
 # 初期セットアップとして、現在のタイムスタンプを更新
 setup_initial_timestamp()
 
 def ensure_file_exists(file_path):
-    #指定されたパスにファイルが存在することを保証する。存在しない場合は新たに作成する。
+    # 指定されたパスにファイルが存在することを保証する。存在しない場合は新たに作成する。
     try:
         # ファイルが存在するか確認し、存在しない場合は作成する
         with open(file_path, 'x') as file:
@@ -38,6 +42,18 @@ def ensure_file_exists(file_path):
     except FileExistsError:
         pass  # ファイルが既に存在する場合、何もしない
 
+# Slackからユーザー情報を取得する関数
+def get_user_info(user_id):
+    try:
+        response = slack_client.users_info(user=user_id)
+        if response['ok']:
+            return response['user']['real_name']
+        else:
+            print(f"Failed to fetch user info: {response['error']}")
+            return None
+    except SlackApiError as e:
+        print(f"Error fetching user info: {e.response['error']}")
+        return None
 
 def get_latest_messages():
     global last_timestamp  # 前回の収集結果を更新するためにglobal宣言
@@ -53,7 +69,7 @@ def get_latest_messages():
 
     new_last_timestamp = last_timestamp  # 新しい最後のタイムスタンプを一時的に保持
 
-    IGNORE_USER_ID = ''  # 無視したいユーザーのID
+    IGNORE_USER_ID = 'U06P15SJRC7'  # 無視したいユーザーのID
 
     with open(OUTPUT_FILE_PATH, 'a') as file:
         for message in messages:
@@ -66,13 +82,18 @@ def get_latest_messages():
             timestamp = float(message.get('ts'))  # Slackからのタイムスタンプは文字列形式で、'ts'キーに格納されている
             text = message.get('text')
 
+            # ユーザー情報を取得
+            user_name = get_user_info(user)
+            if user_name is None:
+                user_name = "Unknown"
+
             # メッセージをテキストファイルに書き込む
-            file.write(f"ユーザ名: {user}, 発言内容: {text}\n")
+            file.write(f"ユーザ名: {user_name}, 発言内容: {text}\n")
     
             # ここでFirebaseにも保存
             doc_ref = db.collection('messages').document()
             doc_ref.set({
-                'user': user,
+                'user': user_name,
                 'text': text,
                 'timestamp': firestore.SERVER_TIMESTAMP  # Firestoreが提供するサーバータイムスタンプ
             })
@@ -89,33 +110,6 @@ last_timestamp = datetime.now().timestamp()
 
 # 30秒ごとにget_latest_messages関数を実行するスケジュールを設定
 schedule.every(30).seconds.do(get_latest_messages)
-
-async def fetch_messages():
-    messages_ref = db.collection('messages')
-    try:
-        # asyncio.to_threadを使用して非同期に変更
-        docs = await asyncio.to_thread(messages_ref.stream)
-    except Exception as e:
-        print(f"Firestoreからのデータ取得中にエラーが発生しました: {e}")
-        return []
-
-    return [doc.to_dict() for doc in docs]
-
-def count_user_messages():
-    messages = asyncio.run(fetch_messages())  # 非同期関数の結果を待機
-
-    # ユーザごとの発言回数をカウント
-    user_message_counts = {}
-    for message in messages:
-        user = message.get('user')
-        user_message_counts[user] = user_message_counts.get(user, 0) + 1  # getメソッドで簡潔に
-
-    # 結果の表示
-    for user, count in user_message_counts.items():
-        print(f"ユーザー {user} の発言回数: {count}")
-
-# 実行例
-count_user_messages()
 
 # Slackにメッセージを投稿する関数
 def post_to_slack(message, channel_id, token):
@@ -188,11 +182,7 @@ def analyze_discussion_and_decide_policy():
 # 分析をスケジュールするための関数を追加
 schedule.every(30).seconds.do(analyze_discussion_and_decide_policy)
 
-# 既存のスケジュール定義の下に、新たなスケジュールを追加
-schedule.every(30).minutes.do(count_user_messages)  # 1分ごとに実行されるように設定
-
 # スケジューラーを起動するための無限ループ
 while True:
     schedule.run_pending()
     time.sleep(1)
-    
