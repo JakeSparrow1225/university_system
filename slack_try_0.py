@@ -6,26 +6,14 @@ import schedule
 import time
 from datetime import datetime
 from datetime import datetime 
-import shutil
+# import shutil
 import openai
 import requests
 import spacy
+from settings import SLACK_ACCESS_TOKEN,TOKEN,CHANNEL_ID,FIREBASE_CREDENTIALS_PATH,OUTPUT_FILE_PATH,OPENAI_API_KEY
 
-
-
-#Slackのbot「1642」のトークンOK
-SLACK_ACCESS_TOKEN = ''
-#Slackのbot「1145」のトークンOK
-TOKEN = ''
-#使ってるSlackのチャンネルIDOK
-CHANNEL_ID = ''
-#FirebaseのパスOK
-FIREBASE_CREDENTIALS_PATH = ''
-#テキストファイルの出力先のパスOk
-OUTPUT_FILE_PATH = ''  
-# OpenAI APIキー
 #chatGPT_version==pip install openai==0.28
-openai.api_key = ''
+openai.api_key = OPENAI_API_KEY
 
 # Firestoreの初期化
 cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
@@ -102,6 +90,25 @@ last_timestamp = datetime.now().timestamp()
 schedule.every(30).seconds.do(get_latest_messages)
 
 # ChatGPT関連
+
+def call_chatgpt(prompt, policy_options):
+    """
+    ChatGPT APIを呼び出して、指定されたプロンプトに対する回答を取得する。
+    prompt: プロンプトのテキスト
+    policy_options: 政策オプションのリスト
+    """
+    response = openai.ChatCompletion.create(
+        model="gpt-4-turbo",  # または使用可能な最新のモデルを指定
+        messages=[{"role": "system", "content": "テキストファイルを分析した際に、議論の状況を改善する場合、最適だと考えられる方針はpolicy_optionsの中のどれかを選択してください。以下のテキストに基づいてください。"},{"role": "user", "content": prompt}],  # 例としてプロンプトを`messages`に組み込む
+        temperature=0.7,
+        max_tokens=150,
+        top_p=1.0,
+        frequency_penalty=0.0,
+        presence_penalty=0.0
+    )
+    # チャットモデルの応答からテキストを取得し、整形して返す
+    return response['choices'][0]['message']['content'].strip()
+
 def calculate_similarity(text1, text2):
     nlp = spacy.load("ja_core_news_md")  # 日本語モデルをロード
     doc1 = nlp(text1)
@@ -132,16 +139,30 @@ def suggest_improvements(choices, policy_options):
     best_policy_options = []
     for choice in top_choices:
         text = choice['text']
-        highest_similarity = -1
-        best_policy_option = None
+        # ChatGPTプロンプトを作成
+        prompt = f"テキストファイルを分析した際に、議論の状況を改善する場合、最適だと考えられる方針はpolicy_optionsの中のどれかを選択してください。以下のテキストに基づいてください:\n\n{text}"
+        # ChatGPT APIを呼び出し
+        chatgpt_response = call_chatgpt(prompt, policy_options)
+        policy_options = [
+        {
+            'policy': '発言量が少ない参加者への発言を喚起する',
+            'message': 'プログラムの作成でつまづいている人はいますか？'
+        },
+        {
+            'policy': '一人が発言し続けないように発言者の固定化を防ぐ',
+            'message': '各自がそれぞれ作成したコードを一度共有しましょう'
+        },
+        {
+            'policy': 'メンバー間で問題点の共有を行い，議論を活発にする',
+            'message': 'この問題を構成しているアルゴリズムを共有しましょう'
+        },
+        # 他の方針とメッセージを追加
+    ]
+        # APIの応答から最適な政策オプションを見つける
         for option in policy_options:
-            similarity = calculate_similarity(text, option['policy'])
-            if similarity > highest_similarity:
-                highest_similarity = similarity
-                best_policy_option = option 
-        if best_policy_option and highest_similarity > 0.3:  # 類似度閾値を超えるもののみをリストに追加
-            best_policy_option['similarity'] = highest_similarity # 類似度をオプションに追加
-            best_policy_options.append(best_policy_option)
+            if option['policy'] in chatgpt_response:
+                best_policy_options.append(option)
+                break
 
     return best_policy_options
 
@@ -213,7 +234,7 @@ analyze_discussion()
 
 # 定期的に分析を実行する関数
 def run_analysis():
-    OUTPUT_FILE_PATH = "discussion_output.txt"
+    # OUTPUT_FILE_PATH = "discussion_output.txt"
     # テキストファイルの内容を確認する
     with open(OUTPUT_FILE_PATH, 'r') as file:
         current_text = file.read()
